@@ -2,6 +2,7 @@
 
 import numpy as np
 import json
+import tensorflow as tf
 
 
 def load_yelp(alphabet):
@@ -28,15 +29,24 @@ def load_yelp(alphabet):
                     print("Non-neutral instances processed: " + str(i))
     return examples, labels
 
+def quantize(x, alphabet):
+    temp = []
+    for text in x:
+        text_end_extracted = extract_end(list(text.lower()))
+        padded = pad_sentence(text_end_extracted)
+        text_int8_repr = string_to_int8_conversion(padded, alphabet)
+        temp.append(text_int8_repr)
+    xq = np.array(temp, dtype=np.int8)
+    return xq
 
 def extract_end(char_seq):
-    if len(char_seq) > 1014:
-        char_seq = char_seq[-1014:]
+    if len(char_seq) > 280:
+        char_seq = char_seq[-280:]
     return char_seq
 
 
 def pad_sentence(char_seq, padding_char=" "):
-    char_seq_length = 1014
+    char_seq_length = 280
     num_padding = char_seq_length - len(char_seq)
     new_char_seq = char_seq + [padding_char] * num_padding
     return new_char_seq
@@ -62,9 +72,14 @@ def get_batched_one_hot(char_seqs_indices, labels, start_index, end_index):
 def load_data():
     # TODO Add the new line character later for the yelp'cause it's a multi-line review
     alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{}\n"
-    examples, labels = load_yelp(alphabet)
-    x = np.array(examples, dtype=np.int8)
-    y = np.array(labels, dtype=np.int8)
+#     examples, labels = load_yelp(alphabet)
+#     x = np.array(examples, dtype=np.int8)
+#     y = np.array(labels, dtype=np.int8)
+    
+    x = np.load('valx.npy')
+    x = quantize(x,alphabet)
+    y = np.load('valy.npy')
+    y = tf.keras.utils.to_categorical(y)
     print("x_char_seq_ind=" + str(x.shape))
     print("y shape=" + str(y.shape))
     return [x, y]
@@ -76,6 +91,8 @@ def batch_iter(x, y, batch_size, num_epochs, shuffle=True):
     """
     # data = np.array(data)
     data_size = len(x)
+    print(x.shape)
+    print(y.shape)
     num_batches_per_epoch = int(data_size/batch_size) + 1
     for epoch in range(num_epochs):
         print("In epoch >> " + str(epoch + 1))
