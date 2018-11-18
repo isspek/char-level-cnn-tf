@@ -3,31 +3,12 @@
 import numpy as np
 import json
 import tensorflow as tf
+from config import Config
 
-
-def load_yelp(alphabet):
-    examples = []
-    labels = []
-    with open('./yelp-review-dataset/yelp_academic_dataset_review.json') as f:
-        i = 0
-        for line in f:
-            review = json.loads(line)
-            stars = review["stars"]
-            text = review["text"]
-            if stars != 3:
-                text_end_extracted = extract_end(list(text.lower()))
-                padded = pad_sentence(text_end_extracted)
-                text_int8_repr = string_to_int8_conversion(padded, alphabet)
-                if stars == 1 or stars == 2:
-                    labels.append([1, 0])
-                    examples.append(text_int8_repr)
-                elif stars == 4 or stars == 5:
-                    labels.append([0, 1])
-                    examples.append(text_int8_repr)
-                i += 1
-                if i % 10000 == 0:
-                    print("Non-neutral instances processed: " + str(i))
-    return examples, labels
+config = Config()
+params = config.params
+sequence_max_length = params['model']['sequence_max_length']
+alphabet = params['alphabet']
 
 def quantize(x, alphabet):
     temp = []
@@ -40,13 +21,13 @@ def quantize(x, alphabet):
     return xq
 
 def extract_end(char_seq):
-    if len(char_seq) > 280:
-        char_seq = char_seq[-280:]
+    if len(char_seq) > sequence_max_length:
+        char_seq = char_seq[-sequence_max_length:]
     return char_seq
 
 
 def pad_sentence(char_seq, padding_char=" "):
-    char_seq_length = 280
+    char_seq_length = sequence_max_length
     num_padding = char_seq_length - len(char_seq)
     new_char_seq = char_seq + [padding_char] * num_padding
     return new_char_seq
@@ -58,7 +39,6 @@ def string_to_int8_conversion(char_seq, alphabet):
 
 
 def get_batched_one_hot(char_seqs_indices, labels, start_index, end_index):
-    alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{}\n"
     x_batch = char_seqs_indices[start_index:end_index]
     y_batch = labels[start_index:end_index]
     x_batch_one_hot = np.zeros(shape=[len(x_batch), len(alphabet), len(x_batch[0]), 1])
@@ -71,14 +51,13 @@ def get_batched_one_hot(char_seqs_indices, labels, start_index, end_index):
 
 def load_data():
     # TODO Add the new line character later for the yelp'cause it's a multi-line review
-    alphabet = "abcdefghijklmnopqrstuvwxyz0123456789-,;.!?:'\"/\\|_@#$%^&*~`+-=<>()[]{}\n"
 #     examples, labels = load_yelp(alphabet)
 #     x = np.array(examples, dtype=np.int8)
 #     y = np.array(labels, dtype=np.int8)
     
-    x = np.load('valx.npy')
+    x = np.load(params['data']['train'])
     x = quantize(x,alphabet)
-    y = np.load('valy.npy')
+    y = np.load(params['data']['label'])
     y = tf.keras.utils.to_categorical(y)
     print("x_char_seq_ind=" + str(x.shape))
     print("y shape=" + str(y.shape))
@@ -91,8 +70,6 @@ def batch_iter(x, y, batch_size, num_epochs, shuffle=True):
     """
     # data = np.array(data)
     data_size = len(x)
-    print(x.shape)
-    print(y.shape)
     num_batches_per_epoch = int(data_size/batch_size) + 1
     for epoch in range(num_epochs):
         print("In epoch >> " + str(epoch + 1))

@@ -9,22 +9,26 @@ import time
 import datetime
 import preprocessing
 from model import CharCNN
+from config import Config
+
+config = Config()
+params = config.params
 
 # Parameters
 # ==================================================
 
 # Model Hyperparameters
-tf.flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
-tf.flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularizaion lambda (default: 0.0)")
+tf.flags.DEFINE_float("dropout_keep_prob", params['model']['dropout_keep_prob'], "Dropout keep probability (default: 0.5)")
+tf.flags.DEFINE_float("l2_reg_lambda", params['model']['l2_reg_lambda'], "L2 regularizaion lambda (default: 0.0)")
 
 # Training parameters
-tf.flags.DEFINE_integer("batch_size", 128, "Batch Size (default: 128)")
-tf.flags.DEFINE_integer("num_epochs", 50, "Number of training epochs (default: 200)")
-tf.flags.DEFINE_integer("evaluate_every", 5000, "Evaluate model on dev set after this many steps (default: 100)")
-tf.flags.DEFINE_integer("checkpoint_every", 1000, "Save model after this many steps (default: 100)")
+tf.flags.DEFINE_integer("batch_size", params['train']['batch_size'], "Batch Size (default: 128)")
+tf.flags.DEFINE_integer("num_epochs", params['train']['num_epochs'], "Number of training epochs (default: 200)")
+tf.flags.DEFINE_integer("evaluate_every", params['train']['evaluate_every'], "Evaluate model on dev set after this many steps (default: 100)")
+tf.flags.DEFINE_integer("checkpoint_every", params['train']['checkpoint_every'], "Save model after this many steps (default: 100)")
 # Misc Parameters
-tf.flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
-tf.flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
+tf.flags.DEFINE_boolean("allow_soft_placement", params['misc']['allow_soft_placement'], "Allow device soft device placement")
+tf.flags.DEFINE_boolean("log_device_placement", params['misc']['log_device_placement'], "Log placement of ops on devices")
 
 FLAGS = tf.flags.FLAGS
 FLAGS(sys.argv)
@@ -66,7 +70,7 @@ with tf.Graph().as_default():
 
         # Define Training procedure
         global_step = tf.Variable(0, name="global_step", trainable=False)
-        optimizer = tf.train.AdamOptimizer(1e-3)
+        optimizer = tf.train.AdamOptimizer(params['model']['adam_optimizer'])
         grads_and_vars = optimizer.compute_gradients(cnn.loss)
         train_op = optimizer.apply_gradients(grads_and_vars, global_step=global_step)
 
@@ -130,8 +134,8 @@ with tf.Graph().as_default():
             Evaluates model on a dev set
             """
             dev_size = len(x_batch)
-            max_batch_size = 500
-            num_batches = dev_size/max_batch_size
+            max_batch_size = params['train']['batch_size']
+            num_batches = int(dev_size/max_batch_size)
             acc = []
             losses = []
             print("Number of batches in dev set is " + str(num_batches))
@@ -141,7 +145,7 @@ with tf.Graph().as_default():
                 feed_dict = {
                   cnn.input_x: x_batch_dev,
                   cnn.input_y: y_batch_dev,
-                  cnn.dropout_keep_prob: 1.0
+                  cnn.dropout_keep_prob: params['model']['dropout_keep_prob']
                 }
                 step, summaries, loss, accuracy = sess.run(
                     [global_step, dev_summary_op, cnn.loss, cnn.accuracy],

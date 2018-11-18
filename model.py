@@ -1,16 +1,24 @@
 # based on ideas from https://github.com/dennybritz/cnn-text-classification-tf
 
 import tensorflow as tf
-
+from config import Config
 
 class CharCNN(object):
     """
     A CNN for text classification.
     based on the Character-level Convolutional Networks for Text Classification paper.
     """
-    def __init__(self, num_classes=2, filter_sizes=(7, 7, 3, 3, 3, 3), num_filters_per_size=256,
-                 l2_reg_lambda=0.0, sequence_max_length=280, num_quantized_chars=70):
-
+    def __init__(self, filter_sizes=(7, 7, 3, 3, 3, 3)):
+        config = Config()
+        self.params = config.params
+        num_filters_per_size = self.params['model']['num_filters_per_size']
+        l2_reg_lambda = self.params['model']['l2_reg_lambda']
+        num_quantized_chars = len(self.params['alphabet'])
+        sequence_max_length = self.params['model']['sequence_max_length']
+        num_classes = self.params['model']['num_classes']
+        output = self.params['model']['output']
+        stddev = self.params['model']['stddev']
+        
         # Placeholders for input, output and dropout
         self.input_x = tf.placeholder(tf.float32, [None, num_quantized_chars, sequence_max_length, 1], name="input_x")
         self.input_y = tf.placeholder(tf.float32, [None, num_classes], name="input_y")
@@ -22,7 +30,7 @@ class CharCNN(object):
         # ================ Layer 1 ================
         with tf.name_scope("conv-maxpool-1"):
             filter_shape = [num_quantized_chars, filter_sizes[0], 1, num_filters_per_size]
-            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.05), name="W")
+            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=stddev), name="W")
             b = tf.Variable(tf.constant(0.1, shape=[num_filters_per_size]), name="b")
             conv = tf.nn.conv2d(self.input_x, W, strides=[1, 1, 1, 1], padding="VALID", name="conv1")
             h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
@@ -36,7 +44,7 @@ class CharCNN(object):
         # ================ Layer 2 ================
         with tf.name_scope("conv-maxpool-2"):
             filter_shape = [1, filter_sizes[1], num_filters_per_size, num_filters_per_size]
-            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.05), name="W")
+            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=stddev), name="W")
             b = tf.Variable(tf.constant(0.1, shape=[num_filters_per_size]), name="b")
             conv = tf.nn.conv2d(pooled, W, strides=[1, 1, 1, 1], padding="VALID", name="conv2")
             h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
@@ -50,7 +58,7 @@ class CharCNN(object):
         # ================ Layer 3 ================
         with tf.name_scope("conv-3"):
             filter_shape = [1, filter_sizes[2], num_filters_per_size, num_filters_per_size]
-            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.05), name="W")
+            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=stddev), name="W")
             b = tf.Variable(tf.constant(0.1, shape=[num_filters_per_size]), name="b")
             conv = tf.nn.conv2d(pooled, W, strides=[1, 1, 1, 1], padding="VALID", name="conv3")
             h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
@@ -58,7 +66,7 @@ class CharCNN(object):
         # ================ Layer 4 ================
         with tf.name_scope("conv-4"):
             filter_shape = [1, filter_sizes[3], num_filters_per_size, num_filters_per_size]
-            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.05), name="W")
+            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=stddev), name="W")
             b = tf.Variable(tf.constant(0.1, shape=[num_filters_per_size]), name="b")
             conv = tf.nn.conv2d(h, W, strides=[1, 1, 1, 1], padding="VALID", name="conv4")
             h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
@@ -66,7 +74,7 @@ class CharCNN(object):
         # ================ Layer 5 ================
         with tf.name_scope("conv-5"):
             filter_shape = [1, filter_sizes[4], num_filters_per_size, num_filters_per_size]
-            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.05), name="W")
+            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=stddev), name="W")
             b = tf.Variable(tf.constant(0.1, shape=[num_filters_per_size]), name="b")
             conv = tf.nn.conv2d(h, W, strides=[1, 1, 1, 1], padding="VALID", name="conv5")
             h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
@@ -74,7 +82,7 @@ class CharCNN(object):
         # ================ Layer 6 ================
         with tf.name_scope("conv-maxpool-6"):
             filter_shape = [1, filter_sizes[5], num_filters_per_size, num_filters_per_size]
-            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=0.05), name="W")
+            W = tf.Variable(tf.truncated_normal(filter_shape, stddev=stddev), name="W")
             b = tf.Variable(tf.constant(0.1, shape=[num_filters_per_size]), name="b")
             conv = tf.nn.conv2d(h, W, strides=[1, 1, 1, 1], padding="VALID", name="conv6")
             h = tf.nn.relu(tf.nn.bias_add(conv, b), name="relu")
@@ -96,10 +104,10 @@ class CharCNN(object):
 
         # Fully connected layer 1
         with tf.name_scope("fc-1"):
-            W = tf.Variable(tf.truncated_normal([num_features_total, 1024], stddev=0.05), name="W")
+            W = tf.Variable(tf.truncated_normal([num_features_total, output], stddev=stddev), name="W")
             # W = tf.get_variable("W", shape=[num_features_total, 1024],
             #                     initializer=tf.contrib.layers.xavier_initializer())
-            b = tf.Variable(tf.constant(0.1, shape=[1024]), name="b")
+            b = tf.Variable(tf.constant(0.1, shape=[output]), name="b")
             # l2_loss += tf.nn.l2_loss(W)
             # l2_loss += tf.nn.l2_loss(b)
 
@@ -112,10 +120,10 @@ class CharCNN(object):
 
         # Fully connected layer 2
         with tf.name_scope("fc-2"):
-            W = tf.Variable(tf.truncated_normal([1024, 1024], stddev=0.05), name="W")
+            W = tf.Variable(tf.truncated_normal([output, output], stddev=stddev), name="W")
             # W = tf.get_variable("W", shape=[1024, 1024],
             #                     initializer=tf.contrib.layers.xavier_initializer())
-            b = tf.Variable(tf.constant(0.1, shape=[1024]), name="b")
+            b = tf.Variable(tf.constant(0.1, shape=[output]), name="b")
             # l2_loss += tf.nn.l2_loss(W)
             # l2_loss += tf.nn.l2_loss(b)
 
@@ -124,7 +132,7 @@ class CharCNN(object):
         # ================ Layer 9 ================
         # Fully connected layer 3
         with tf.name_scope("fc-3"):
-            W = tf.Variable(tf.truncated_normal([1024, num_classes], stddev=0.05), name="W")
+            W = tf.Variable(tf.truncated_normal([output, num_classes], stddev=stddev), name="W")
             b = tf.Variable(tf.constant(0.1, shape=[num_classes]), name="b")
             # l2_loss += tf.nn.l2_loss(W)
             # l2_loss += tf.nn.l2_loss(b)
